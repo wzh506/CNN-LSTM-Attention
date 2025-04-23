@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import pandas as pd
 
 # Load the Excel file
-file_path = '/mnt/data/merged_data.xlsx'
+file_path = '/home/zhaohui1.wang/github/CNN-LSTM-Attention/merged_data_2.xlsx'
 
 # Read the data
 data = pd.read_excel(file_path)
@@ -19,8 +19,8 @@ data.head()
 
 
 # Extract relevant columns for input and target variables
-input_columns = ['lrad', 'prec', 'srad', 'Tmax', 'Tmin', 'wind', 'ET0', 'SPEI']
-target_columns = ['Yield', 'Trend Yield', 'Relative Meteorological Yield']
+input_columns = ['lrad', 'prec', 'srad', 'Tmax', 'Tmin', 'wind','SPEI','Kc','sa','VPD','RH']
+target_columns = ['Wg', 'Wb']
 
 # Filter the data
 data_filtered = data[input_columns + target_columns]
@@ -32,7 +32,7 @@ data_filtered = data_filtered.fillna(data_filtered.mean())
 scaler = StandardScaler()
 scaled_inputs = scaler.fit_transform(data_filtered[input_columns])
 
-# Use the last 3 columns as targets
+# Use the last 2 columns as targets
 targets = data_filtered[target_columns].values
 
 # Reshape the data for LSTM: 3D array (samples, timesteps, features)
@@ -109,7 +109,7 @@ for epoch in range(epochs):
     print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
 
 # Save the trained model
-torch.save(model.state_dict(), "/mnt/data/lstm_model.pth")  # Save the model to a file
+torch.save(model.state_dict(), "lstm_model.pth")  # Save the model to a file
 
 # Example: Test the model on the test set (optional)
 model.eval()
