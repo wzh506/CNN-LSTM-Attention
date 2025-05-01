@@ -12,11 +12,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 # 读取 Excel 文件
-df = pd.read_excel('merged_data_2.xlsx')
+df = pd.read_excel('final_data.xlsx')
 
-window_size = 10 #选择3年作为窗口大小
+window_size = 4 #选择3年作为窗口大小
 
-features = ['lrad', 'prec', 'srad', 'Tmax', 'Tmin', 'wind', 'SPEI', 'Kc', 'sa', 'VPD', 'RH']
+features = ['lrad', 'prec', 'srad', 'Tmax', 'Tmin', 'wind', 'SPEI','SSD', 'VPD', 'RH']
 targets = ['Wg', 'Wb']
 combined_cols = features + targets
 
