@@ -1,0 +1,41 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train and Test Model (CUDA 0 - Wb)",
+            "type": "python",
+            "request": "launch",
+            "program": "trainer.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wb"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false
+        },
+        {
+            "name": "Train and Test Model (CUDA 1 - Wg)",
+            "type": "python",
+            "request": "launch",
+            "program": "trainer.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wg"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "1"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false
+        }
+    ]
+}
