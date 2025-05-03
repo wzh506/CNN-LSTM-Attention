@@ -103,7 +103,7 @@ class DCLFormer(nn.Module):
         )
         
         # 注意力机制
-        self.attention = MultiHeadAttention(lstm_hidden_size, num_heads=4)
+        self.attention = MultiHeadAttention(lstm_hidden_size, num_heads=8)
         
         # 全连接层
         self.fc = nn.Sequential(
@@ -120,7 +120,7 @@ class DCLFormer(nn.Module):
         cnn_out = cnn_out.permute(0, 2, 1)      # 恢复为(batch_size, new_seq_len, features)
 
         # cnn_out2 = self.cnn2(cnn_out.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
-        cnn_out2 = self.cnn2(cnn_out.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
+        cnn_out2 = self.cnn2(x.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
         cnn_out2 = cnn_out2.permute(0, 2, 1)      # 恢复为(batch_size, new_seq_len, features)
         
         # LSTM处理
