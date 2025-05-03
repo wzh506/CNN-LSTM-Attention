@@ -56,7 +56,7 @@ class Res_Block(nn.Module):
         super(Res_Block, self).__init__()
         self.conv1 = nn.Conv1d(input_size, 128, kernel_size=cnn_kernel_size, padding=1)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv1d(128, 38, kernel_size=cnn_kernel_size, padding=1)
+        self.conv2 = nn.Conv1d(128, input_size, kernel_size=cnn_kernel_size, padding=1)
  
     def forward(self, x):
         res = self.conv1(x)
@@ -119,6 +119,7 @@ class DCLFormer(nn.Module):
         cnn_out = self.cnn1(x.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
         cnn_out = cnn_out.permute(0, 2, 1)      # 恢复为(batch_size, new_seq_len, features)
 
+        # cnn_out2 = self.cnn2(cnn_out.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
         cnn_out2 = self.cnn2(cnn_out.permute(0, 2, 1))  # 转换为(batch_size, input_size, seq_len)
         cnn_out2 = cnn_out2.permute(0, 2, 1)      # 恢复为(batch_size, new_seq_len, features)
         
