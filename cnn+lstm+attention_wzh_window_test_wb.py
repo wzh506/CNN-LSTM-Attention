@@ -21,7 +21,7 @@ from models import DCLFormer
 df = pd.read_excel('final_data.xlsx')
 window_size = 3
 features = ['prec', 'srad', 'Tmax', 'Tmin', 'wind', 'SPEI', 'VPD', 'RH']
-targets = ['Wg', 'Wb']
+targets = ['Wb']
 combined_cols = features + targets
 
 # 获取所有城市列表（假设有city列）
@@ -170,7 +170,7 @@ y_train = y_train.to(device)
 
 # torch.save(model,'model/DCLFormer_79999.pth')
 model2 = DCLFormer(input_size=X.shape[-1], output_size=y.shape[-1])
-model2.load_state_dict(torch.load('model/DCLFormer_144999.pth'))
+model2.load_state_dict(torch.load('model/wb/DCLFormer.pth'))
 # 测试模型
 model2.to('cpu')
 model2.eval()
