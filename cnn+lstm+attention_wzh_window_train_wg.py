@@ -115,6 +115,7 @@ if __name__ == "__main__":
         X_seq.append(input_features)
         y_seq.append(target_output)
 
+    
     # 转换为数组
     X = np.array(X_seq)  # 形状: (样本数, 城市数, 输入维度)
     y = np.array(y_seq)  # 形状: (样本数, 城市数, 2)
