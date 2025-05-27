@@ -1,1 +1,1 @@
-from .model import DCLFormer
+from .model import DCLFormer,LSTM,CNN_LSTM
