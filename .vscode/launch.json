@@ -27,6 +27,56 @@
             "justMyCode": true
         },
         {
+            "name": "Generate Weights (CUDA 0 - Wb)",
+            "type": "python",
+            "request": "launch",
+            "program": "trainer_weights.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wb",
+                "--dataset", "huabei_1993to2017.xlsx",
+                // "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250525175932/DCLFormer.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
+            "name": "Generate Weights (CUDA 0 - Wg)",
+            "type": "python",
+            "request": "launch",
+            "program": "trainer_weights.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wg",
+                "--dataset", "huabei_1993to2017.xlsx",
+                // "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250525175932/DCLFormer.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
             "name": "Train and Test Model (CUDA 1 - Wg)",
             "type": "python",
             "request": "launch",
@@ -39,7 +89,7 @@
                 // "--checkpoint_path","model/DCLFormer/['Wg']_sc2_20250525175932/DCLFormer.pth",
                 "--sc","2",
                 "--dataset", "huabei_1993to2017.xlsx",
-
+                "--mod","DCLFormer",
                 // "--features", "Tmax", "wind", "prec",
             ],
             "console": "integratedTerminal",
