@@ -320,7 +320,7 @@ class LSTM(nn.Module):
         )
         
         self.lstm = nn.LSTM(
-            input_size=input_size + embed_dim -1,
+            input_size=input_size -1,
             # input_size=input_size, 
             hidden_size=hidden_dim,
             num_layers=num_layers,
@@ -339,7 +339,7 @@ class LSTM(nn.Module):
 
         combined=x
         
-        out, _ = self.lstm(combined)  # out shape: [batch, seq_len, hidden_dim]
+        out, _ = self.lstm(combined[:,:,:-1])  # out shape: [batch, seq_len, hidden_dim]
         out = self.fc(out)     # shape: [batch, seq_len, output_size]
         return out
     
@@ -355,7 +355,7 @@ class CNN_LSTM(nn.Module):
         # CNN 模块
         self.cnn = nn.Sequential(
             nn.Conv1d(  # 一维卷积处理时间序列
-                in_channels=input_size+embed_dim -1,  # 输入特征数
+                in_channels=input_size-1,  # 输入特征数
                 out_channels=hidden_dim, 
                 kernel_size=3,
                 padding=1  # 保持序列长度不变
@@ -397,11 +397,13 @@ class CNN_LSTM(nn.Module):
         # cnn_input = combined.permute(0, 2, 1)
         
         # 调整维度以适配 Conv1d
-        x = x.permute(0, 2, 1)  # [batch, input_size, seq_len]
+        x2 = x[..., :-1]
+        x2 = x2.permute(0, 2, 1)  # [batch, input_size, seq_len]
+        
         
         # 通过 CNN 提取特征
         # cnn_out = self.cnn(cnn_input)  # [batch, hidden_dim, seq_len]
-        cnn_out = self.cnn(x)
+        cnn_out = self.cnn(x2)
         
         # 恢复维度以适配 LSTM
         cnn_out = cnn_out.permute(0, 2, 1)  # [batch, seq_len, hidden_dim]

@@ -12,6 +12,7 @@ targets_1="Wg"
 mod1='LSTM'
 # mod1='CNN+LSTM'
 
+# ssh -p 30611 zhaohui1.wang@10.251.18.148
 epochs=200000
 
 # 循环执行不同sc值

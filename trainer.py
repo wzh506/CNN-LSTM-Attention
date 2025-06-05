@@ -79,8 +79,255 @@ def generate_emb(current_cities):
         emb_dict[city] = i
     return emb_dict
 
+def generate_data(config):
+    # 读取数据
+    df = pd.read_excel(config.dataset)
+    window_size = config.window
+    if config.sc is  None:
+        features = config.features
+    else:
+        features = select_features(config.sc,config.targets)
+        config.features = features
+    targets = config.targets
+    
+    if config.use_combined is True:
+        combined_cols = features + targets
+    else:
+        combined_cols = features
+    os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda
 
 
+
+    # 获取所有城市列表（假设有city列）
+    print('all_cities:',df.keys())
+    all_cities = df['city'].unique().tolist()
+    if config.method == 'mean':
+        # 创建包含所有城市的空DataFrame模板
+        full_city_df = pd.DataFrame({'city': all_cities})
+
+        # 构建年份字典（带填充）
+        year_dict = {year: group.reset_index(drop=True) for year, group in df.groupby('year')}
+        # 在填充前创建存在性记录字典
+        existence_dict = {}
+        years = sorted(year_dict.keys())
+        for year in years:
+            # 获取该年实际存在的城市
+            existing_cities = set(year_dict[year]['city'])
+            # 创建存在性数组（1表示存在，0表示填充）
+            existence = np.array([1 if c in existing_cities else 0 for c in all_cities])
+            existence_dict[year] = existence
+
+        # 转换为三维存在性张量（年份 × 城市 × 存在性）
+        existence_tensor = np.stack([existence_dict[y] for y in sorted(years)])
+        existence_tensor = existence_tensor[window_size:] #前面几年没有用上
+
+        year_dict = {}
+        city_features_mean = {}  # 存储每个城市的特征均值
+
+        # 第一步：计算每个城市的跨年特征均值
+        for city in all_cities:
+            city_data = df[df['city'] == city][combined_cols]
+            city_features_mean[city] = {
+                'features': city_data[features].mean().to_dict(),
+                'targets': city_data[targets].mean().to_dict()
+            }
+
+        # 第二步：填充每个年份的数据
+        for year, group in df.groupby('year'):
+
+            # 外连接合并确保包含所有城市/
+            merged = pd.merge(full_city_df, group, on='city', how='left', suffixes=('', '_y'))
+
+            # 填充逻辑
+            for city in all_cities:
+                mask = merged['city'] == city
+                if merged.loc[mask, features+targets].isnull().any().any():
+                    # 填充特征
+                    for f in features:
+                        if pd.isna(merged.loc[mask, f]).any():
+                            merged.loc[mask, f] = city_features_mean[city]['features'][f]
+                    # 填充目标
+                    for t in targets:
+                        if pd.isna(merged.loc[mask, t]).any():
+                            merged.loc[mask, t] = city_features_mean[city]['targets'][t]
+            
+            # 排序保持城市顺序一致
+            year_dict[year] = merged.sort_values('city').reset_index(drop=True)
+        valid_cities = all_cities
+    elif config.method == 'delete':
+        # 删除缺失值
+        city_presence = defaultdict(set)
+        years = sorted(df['year'].unique())
+
+        for year, group in df.groupby('year'):
+            existing_cities = set(group['city'])
+            for city in existing_cities:
+                city_presence[city].add(year)
+
+        # 步骤2：找出所有年份都存在的城市
+        valid_cities = []
+        for city, present_years in city_presence.items():
+            if present_years == set(years):  # 必须包含所有年份
+                # 进一步检查每个年份的数据完整性
+                city_valid = True
+                for year in years:
+                    year_data = df[(df['year'] == year) & (df['city'] == city)]
+                    if year_data[combined_cols].isnull().any().any():
+                        city_valid = False
+                        break
+                if city_valid:
+                    valid_cities.append(city)
+
+        print(f"原始城市数: {len(df['city'].unique())} → 有效城市数: {len(valid_cities)}")
+        
+        
+        # 获取原始城市列表和有效城市列表
+        original_cities = set(df['city'].dropna().unique())  # 去除NaN并转为集合
+        valid_cities_set = set(valid_cities)                 # 确保有效城市也是集合
+
+        # 计算差异城市
+        missing_cities = original_cities - valid_cities_set
+
+        # 生成可读性强的输出
+        missing_str = ', '.join(sorted(missing_cities)) if missing_cities else "无"
+        print(
+            f"原始城市数: {len(original_cities)} → 有效城市数: {len(valid_cities)}\n"
+            f"被过滤城市 ({len(missing_cities)}个): {missing_str}"
+        )
+
+        # 过滤数据集（只保留有效城市）
+        df = df[df['city'].isin(valid_cities)]
+
+        # 按年份构建完整数据集（现在所有城市在所有年份都有数据）
+        year_dict = {}
+        for year, group in df.groupby('year'):
+            # 按城市排序保证各年顺序一致
+            year_dict[year] = group.sort_values('city').reset_index(drop=True)
+
+        # 构建时间序列数据集（带窗口校验）
+        years = sorted(year_dict.keys())
+        X_seq, y_seq = [], []
+
+        for i in range(window_size, len(years)):
+            # 检查窗口期数据完整性
+            window_years = years[i-window_size:i]
+            current_year = years[i]
+            
+            # 获取当前年的所有城市
+            current_cities = year_dict[current_year]['city'].tolist()
+            
+            # 校验窗口期城市一致性
+            valid_in_window = True
+            for y in window_years:
+                if year_dict[y]['city'].tolist() != current_cities:
+                    valid_in_window = False
+                    break
+            
+            if valid_in_window:
+                # 构建特征序列 [window_size, num_cities, input_dim]
+                window_data = [year_dict[y][combined_cols].values for y in window_years]#这里去掉最后的wb和wg
+                current_features = year_dict[current_year][features+['city']].values
+                
+                #成功完成城市特征编码
+                city_emb = generate_emb(current_cities)
+                for feature in current_features:
+                    if feature[-1] in city_emb:
+                        feature[-1] = city_emb[feature[-1]]
+                
+                # 拼接特征维度：[历史特征 + 当前特征]+城市 
+                input_features = np.concatenate(window_data + [current_features], axis=1)
+                print('input_features:',input_features.shape)
+                print('window_data :',window_data[0].shape)
+                print('current_features:',current_features.shape)
+                # 获取目标值
+                target_output = year_dict[current_year][targets].values
+                
+                X_seq.append(input_features)
+                y_seq.append(target_output)
+
+        # 转换为数组，特征x4+1，最后一维是城市编码
+        X = np.array(X_seq)  # 形状: (可计算的样本年份数, 城市数, 输入维度)
+        y = np.array(y_seq)  # 形状: (可计算的样本年份数, 城市数, 输出维度)
+
+        # # 构建时间序列数据集
+        # years = sorted(year_dict.keys())
+        # X_seq, y_seq = [], []
+
+
+
+        # for i in range(window_size, len(years)):
+        #     # 当前预测年
+        #     current_year = years[i]
+        #     window_years = [years[i-k-1] for k in range(window_size)]
+            
+        #     # 收集窗口期数据（含3个历史年）
+        #     window_data = []
+        #     for y in window_years:
+        #         df_year = year_dict[y][combined_cols]
+        #         window_data.append(df_year.values)
+            
+        #     # 当前年特征
+        #     current_features = year_dict[current_year][features].values
+            
+        #     # 拼接特征维度：[历史特征 + 当前特征]
+        #     input_features = np.concatenate(window_data + [current_features], axis=1)
+            
+        #     # 获取目标值
+        #     target_output = year_dict[current_year][targets].values
+            
+        #     # 添加到序列
+        #     X_seq.append(input_features)
+        #     y_seq.append(target_output)
+
+    # 转换为数组
+    X = np.array(X_seq)  # 形状: (样本数, 城市数, 输入维度)
+    y = np.array(y_seq)  # 形状: (样本数, 城市数, 2)
+    print(f'valid_cities:',valid_cities)
+    #检查是否有nan
+    # for x in X:
+    #     if np.isnan(x).any():
+    #         print("nan !")
+            
+    # x[batch,city, feature]
+
+    scaler = StandardScaler()
+    X_features=X[:,:,:-1] 
+    X_cities=X[:,:,-1]# 去掉最后一个维度
+    X_scaled = scaler.fit_transform(X_features.reshape(-1, X_features.shape[-1])).reshape(X_features.shape)
+    X_all = np.concatenate([X_features, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
+    # X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+
+    # 转换为PyTorch Tensor
+    X_tensor = torch.tensor(X_all, dtype=torch.float32)
+    y_tensor = torch.tensor(y, dtype=torch.float32)
+    if config.method == 'mean':
+        existence_tensor = torch.tensor(existence_tensor, dtype=torch.float32)#创建一个张量
+        existence_tensor = existence_tensor.unsqueeze(-1)  # 添加一个维度以匹配目标输出的形状
+        X_tensor = torch.cat([X_tensor,existence_tensor],dim=-1)  
+    else:
+        pass
+        # existence_tensor = torch.ones([X.shape[0], X.shape[1]])  # 创建一个全1的存在性张量
+    # existence_tensor = existence_tensor.unsqueeze(-1)  # 添加一个维度以匹配目标输出的形状
+    # X_tensor = torch.cat([X_tensor,existence_tensor],dim=-1)  # 将存在性张量应用于输入数据,最后一个维度是当前年数据是否存在
+
+
+
+    # 验证数据维度
+    print(f"输入数据维度: {X_tensor.shape}")  # 应为 (样本数, 城市数, 输入特征数)
+    print(f"目标数据维度: {y_tensor.shape}")  # 应为 (样本数, 城市数, 2)
+
+    # 划分训练测试集
+    # 采用随机划分
+    # X_train, X_test, y_train, y_test = train_test_split(X_tensor, y_tensor, test_size=0.1, random_state=42)#10:1的比例差不多
+    X_train = X_tensor[:int(len(X_tensor)*0.9)]
+    y_train = y_tensor[:int(len(X_tensor)*0.9)]
+    
+    X_test = X_tensor[int(len(X_tensor)*0.9):]
+    y_test = y_tensor[int(len(X_tensor)*0.9):]
+
+    print(f"测试集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
+    print(f"训练集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
+    return current_cities, X_train, y_train, X_test, y_test, scaler, X_tensor,y_tensor
 
 def train_model(config):
     # 读取数据
@@ -332,7 +579,7 @@ def train_model(config):
     print(f"测试集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
 
 
-
+##############################################################################################################################################
     # 初始化模型
     print('使用的模型为:',config.mod)
     if config.mod == 'DCLFormer':
@@ -426,7 +673,7 @@ def train_model(config):
                     X_test = X_test.cpu()
                     y_test = y_test.cpu()
             else:    #对于DCLFormer外的其他模型采用如下训练方式
-                if epoch < int(config.epochs//3*5): #
+                if epoch < int(config.epochs//4*1): #
                     model.train()
                     optimizer.zero_grad()
                     # inputs = X_train[:,:,:X_train.shape[-1]-1]  # 去掉最后一个维度
