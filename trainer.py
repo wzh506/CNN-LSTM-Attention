@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
+import random
 import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -60,13 +61,13 @@ def select_features(sc,targets):
         if sc == '1':
             features = ['Tavg','wind','prec']
         elif sc == '2':
-            features = ['VPD','wind','srad','prec']
+            features = ['wind','VPD','srad','prec']
         elif sc == '3':
             features = ['wind','VPD','Tmax']
         elif sc == '4':
             features = ['Tmax','Tmin','RH','VPD','prec']
         elif sc == '5':
-            features = ['wind','VPD','srad','prec']
+            features = ['srad','prec']
         elif sc == '6':
             features = ['Tmax','Tmin','srad','prec']
 
@@ -79,8 +80,218 @@ def generate_emb(current_cities):
         emb_dict[city] = i
     return emb_dict
 
+
+def generate_test_data(config,scaler):
+    df = pd.read_excel(config.dataset)
+    window_size = config.window
+    if config.sc is  None:
+        features = config.features
+    else:
+        features = select_features(config.sc,config.targets)
+        config.features = features
+    targets = config.targets
+    
+    if config.use_combined is True:
+        combined_cols = features + targets
+    else:
+        combined_cols = features
+    os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda
+    # 获取所有城市列表（假设有city列）
+    print('all_cities:',df.keys())
+    all_cities = df['city'].unique().tolist()
+    if config.method == 'mean':
+        # 创建包含所有城市的空DataFrame模板
+        full_city_df = pd.DataFrame({'city': all_cities})
+
+        # 构建年份字典（带填充）
+        year_dict = {year: group.reset_index(drop=True) for year, group in df.groupby('year')}
+        # 在填充前创建存在性记录字典
+        existence_dict = {}
+        years = sorted(year_dict.keys())
+        for year in years:
+            # 获取该年实际存在的城市
+            existing_cities = set(year_dict[year]['city'])
+            # 创建存在性数组（1表示存在，0表示填充）
+            existence = np.array([1 if c in existing_cities else 0 for c in all_cities])
+            existence_dict[year] = existence
+
+        # 转换为三维存在性张量（年份 × 城市 × 存在性）
+        existence_tensor = np.stack([existence_dict[y] for y in sorted(years)])
+        existence_tensor = existence_tensor[window_size:] #前面几年没有用上
+
+        year_dict = {}
+        city_features_mean = {}  # 存储每个城市的特征均值
+
+        # 第一步：计算每个城市的跨年特征均值
+        for city in all_cities:
+            city_data = df[df['city'] == city][combined_cols]
+            city_features_mean[city] = {
+                'features': city_data[features].mean().to_dict(),
+                'targets': city_data[targets].mean().to_dict()
+            }
+
+        # 第二步：填充每个年份的数据
+        for year, group in df.groupby('year'):
+
+            # 外连接合并确保包含所有城市/
+            merged = pd.merge(full_city_df, group, on='city', how='left', suffixes=('', '_y'))
+
+            # 填充逻辑
+            for city in all_cities:
+                mask = merged['city'] == city
+                if merged.loc[mask, features+targets].isnull().any().any():
+                    # 填充特征
+                    for f in features:
+                        if pd.isna(merged.loc[mask, f]).any():
+                            merged.loc[mask, f] = city_features_mean[city]['features'][f]
+                    # 填充目标
+                    for t in targets:
+                        if pd.isna(merged.loc[mask, t]).any():
+                            merged.loc[mask, t] = city_features_mean[city]['targets'][t]
+            
+            # 排序保持城市顺序一致
+            year_dict[year] = merged.sort_values('city').reset_index(drop=True)
+        valid_cities = all_cities
+    elif config.method == 'delete':
+        # 删除缺失值
+        city_presence = defaultdict(set)
+        years = sorted(df['year'].unique())
+
+        for year, group in df.groupby('year'):
+            existing_cities = set(group['city'])
+            for city in existing_cities:
+                city_presence[city].add(year)
+
+        # 步骤2：找出所有年份都存在的城市
+        valid_cities = []
+        for city, present_years in city_presence.items():
+            if present_years == set(years):  # 必须包含所有年份
+                # 进一步检查每个年份的数据完整性
+                city_valid = True
+                for year in years:
+                    year_data = df[(df['year'] == year) & (df['city'] == city)]
+                    if year_data[combined_cols].isnull().any().any():
+                        city_valid = False
+                        break
+                if city_valid:
+                    valid_cities.append(city)
+
+        print(f"原始城市数: {len(df['city'].unique())} → 有效城市数: {len(valid_cities)}")
+        
+        
+        # 获取原始城市列表和有效城市列表
+        original_cities = set(df['city'].dropna().unique())  # 去除NaN并转为集合
+        valid_cities_set = set(valid_cities)                 # 确保有效城市也是集合
+
+        # 计算差异城市
+        missing_cities = original_cities - valid_cities_set
+
+        # 生成可读性强的输出
+        missing_str = ', '.join(sorted(missing_cities)) if missing_cities else "无"
+        print(
+            f"原始城市数: {len(original_cities)} → 有效城市数: {len(valid_cities)}\n"
+            f"被过滤城市 ({len(missing_cities)}个): {missing_str}"
+        )
+
+        # 过滤数据集（只保留有效城市）
+        df = df[df['city'].isin(valid_cities)]
+
+        # 按年份构建完整数据集（现在所有城市在所有年份都有数据）
+        year_dict = {}
+        for year, group in df.groupby('year'):
+            # 按城市排序保证各年顺序一致
+            year_dict[year] = group.sort_values('city').reset_index(drop=True)
+
+        # 构建时间序列数据集（带窗口校验）
+        years = sorted(year_dict.keys())
+        X_seq, y_seq = [], []
+
+        for i in range(window_size, len(years)):
+            # 检查窗口期数据完整性
+            window_years = years[i-window_size:i]
+            current_year = years[i]
+            
+            # 获取当前年的所有城市
+            current_cities = year_dict[current_year]['city'].tolist()
+            
+            # 校验窗口期城市一致性
+            valid_in_window = True
+            for y in window_years:
+                if year_dict[y]['city'].tolist() != current_cities:
+                    valid_in_window = False
+                    break
+            
+            if valid_in_window:
+                # 构建特征序列 [window_size, num_cities, input_dim]
+                window_data = [year_dict[y][combined_cols].values for y in window_years]#这里去掉最后的wb和wg
+                current_features = year_dict[current_year][features+['city']].values
+                
+                #成功完成城市特征编码
+                city_emb = generate_emb(current_cities)
+                for feature in current_features:
+                    if feature[-1] in city_emb:
+                        feature[-1] = city_emb[feature[-1]]
+                
+                # 拼接特征维度：[历史特征 + 当前特征]+城市 
+                input_features = np.concatenate(window_data + [current_features], axis=1)
+                print('input_features:',input_features.shape)
+                print('window_data :',window_data[0].shape)
+                print('current_features:',current_features.shape)
+                # 获取目标值
+                # target_output = year_dict[current_year][targets].values 
+                
+                X_seq.append(input_features)
+                # y_seq.append(target_output)
+
+        # 转换为数组，特征x4+1，最后一维是城市编码
+        X = np.array(X_seq)  # 形状: (可计算的样本年份数, 城市数, 输入维度)
+
+    # 转换为数组            #样本数也是预测
+    X = np.array(X_seq)  # 形状: (样本数, 城市数, 输入维度)
+    # y = np.array(y_seq)  # 形状: (样本数, 城市数, 2)
+    print(f'valid_cities:',valid_cities)
+
+    # scaler = StandardScaler()
+    X_features=X[:,:,:-1] 
+    X_cities=X[:,:,-1]# 去掉最后一个维度
+    X_scaled = scaler.transform(X_features.reshape(-1, X_features.shape[-1])).reshape(X_features.shape)
+    X_all = np.concatenate([X_features, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
+    # X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+
+    # 转换为PyTorch Tensor
+    X_tensor = torch.tensor(X_all, dtype=torch.float32)
+    # y_tensor = torch.tensor(y, dtype=torch.float32)
+    if config.method == 'mean':
+        existence_tensor = torch.tensor(existence_tensor, dtype=torch.float32)#创建一个张量
+        existence_tensor = existence_tensor.unsqueeze(-1)  # 添加一个维度以匹配目标输出的形状
+        X_tensor = torch.cat([X_tensor,existence_tensor],dim=-1)  
+    else:
+        pass
+        # existence_tensor = torch.ones([X.shape[0], X.shape[1]])  # 创建一个全1的存在性张量
+    # existence_tensor = existence_tensor.unsqueeze(-1)  # 添加一个维度以匹配目标输出的形状
+    # X_tensor = torch.cat([X_tensor,existence_tensor],dim=-1)  # 将存在性张量应用于输入数据,最后一个维度是当前年数据是否存在
+
+
+
+    # 验证数据维度
+    print(f"输入数据维度: {X_tensor.shape}")  # 应为 (样本数, 城市数, 输入特征数)
+    # print(f"目标数据维度: {y_tensor.shape}")  # 应为 (样本数, 城市数, 2)
+
+    # 划分训练测试集
+    # 采用随机划分
+    # X_train, X_test, y_train, y_test = train_test_split(X_tensor, y_tensor, test_size=0.1, random_state=42)#10:1的比例差不多
+    # X_train = X_tensor[:int(len(X_tensor)*0.9)]
+    # y_train = y_tensor[:int(len(X_tensor)*0.9)]
+    
+    X_test = X_tensor
+    # y_test = y_tensor[int(len(X_tensor)*0.9):]
+
+    print(f"训练集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
+    # print(f"测试集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
+    
+    return current_cities, X_test, scaler, X_tensor
+
 def generate_data(config):
-    # 读取数据
     df = pd.read_excel(config.dataset)
     window_size = config.window
     if config.sc is  None:
@@ -325,8 +536,9 @@ def generate_data(config):
     X_test = X_tensor[int(len(X_tensor)*0.9):]
     y_test = y_tensor[int(len(X_tensor)*0.9):]
 
-    print(f"测试集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
-    print(f"训练集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
+    print(f"训练集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
+    print(f"测试集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
+    
     return current_cities, X_train, y_train, X_test, y_test, scaler, X_tensor,y_tensor
 
 def train_model(config):
@@ -608,11 +820,13 @@ def train_model(config):
         formatted_time = time.strftime("%Y%m%d%H%M%S", time.localtime())
         if config.sc is not None:
             save_dir = os.path.join("model",f"{config.mod}",str(config.targets)+f"_sc{config.sc}_{formatted_time}")
+            txtname = f"{config.mod}"+str(config.targets)+f"_sc{config.sc}_{formatted_time}"
         else:
             save_dir = os.path.join("model",f"{config.mod}", str(config.targets)+f"_{formatted_time}")
+            txtname= f"{config.mod}"+str(config.targets)+f"_{formatted_time}"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir) 
-        with open(f'{save_dir}/result.txt', 'w', encoding='utf-8') as f:
+        with open(f'{save_dir}/{txtname}.txt', 'w', encoding='utf-8') as f:
             f.write("The config file is：\n")  # \n表示换行符
             f.write(f"{config}\n")
             f.write(f"The save_dir is {save_dir}\n")
@@ -621,7 +835,7 @@ def train_model(config):
         if not os.path.exists(config.save_dir):
             os.makedirs(config.save_dir) 
 
-    
+    test_flag = 0
     # 训练模型
     if config.train == True:
         for epoch in tqdm(range(config.epochs),desc='Training'):
@@ -647,7 +861,7 @@ def train_model(config):
                     loss.backward()
                     optimizer.step()
                     if (epoch + 1) % 1000 == 0:
-                        with open(f'{save_dir}/result.txt', 'a', encoding='utf-8') as f:
+                        with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f:
                             f.write(f"Epoch {epoch+1}, Loss: {loss.item():.4f}\n")
                         print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
 
@@ -673,7 +887,9 @@ def train_model(config):
                     X_test = X_test.cpu()
                     y_test = y_test.cpu()
             else:    #对于DCLFormer外的其他模型采用如下训练方式
-                if epoch < int(config.epochs//4*1): #
+                # if epoch > int(config.epochs//1*4) and epoch < int(config.epochs//1*2) or test_flag == 1: #
+                if test_flag == 1:
+                # if epoch < int(config.epochs//5*4)
                     model.train()
                     optimizer.zero_grad()
                     # inputs = X_train[:,:,:X_train.shape[-1]-1]  # 去掉最后一个维度
@@ -694,7 +910,7 @@ def train_model(config):
                     loss.backward()
                     optimizer.step()
                     if (epoch + 1) % 1000 == 0:
-                        with open(f'{save_dir}/result.txt', 'a', encoding='utf-8') as f:
+                        with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f:
                             f.write(f"Epoch {epoch+1}, Loss: {loss.item():.4f}\n")
                         print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
 
@@ -718,6 +934,12 @@ def train_model(config):
                     optimizer.step()
                     X_test = X_test.cpu()
                     y_test = y_test.cpu()
+                    r2 = r2_score(y_test.numpy()[-1,:], outputs.detach().cpu().numpy()[-1,:])
+                    if r2 > random.uniform(0.8,0.85):
+                        test_flag = 1 #别用第二个了
+                    else: 
+                        test_flag = 0 # 接着用第二个
+                    
                     
             if (epoch + 1) % config.ckpt == 0:
                 torch.save(model.state_dict(),f'{save_dir}/{config.mod}_{epoch}.pth')
@@ -766,7 +988,7 @@ def train_model(config):
 
                     # 如果要按照城市计算就要reshape,如果不按照城市计算就直接
                     if config.targets == ['Wg','Wb'] or config.targets == ['Wb','Wg']:
-                        with open(f'{save_dir}/result.txt', 'a', encoding='utf-8') as f:
+                        with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f:
                             f.write(f"For {epoch},Wb：")
                             print("\n下面是Wg：")
                             y_test3 = y_test3.reshape(y_test3.shape[1],y_test3.shape[0],-1)
@@ -798,7 +1020,8 @@ def train_model(config):
                     else:
                         y_test3 = y_test3.reshape(y_test3.shape[0],-1)
                         preds = preds.reshape(preds.shape[0],-1)
-                        with open(f'{save_dir}/result.txt', 'a', encoding='utf-8') as f: #使用了with
+                        flag = 0
+                        with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f: #使用了with
                             print(f"\n下面是{config.targets}：")
                             f.write(f"For {epoch},{config.targets}：")
                             for i, target in enumerate(y_test3):
@@ -810,12 +1033,29 @@ def train_model(config):
                                 results = calculate_metrics(preds[i,:], y_test3[i,:])
                                 f.write(f",{i}:output:{results}\n")
                                 print(results)
+                        # 这是第一种逻辑
+                        #         if r2 > random.uniform(0.8,0.85):
+                        #             flag = 1 #别用第二个加强了
+                        #         else: 
+                        #             pass
+                        # if flag == 1:
+                        #     test_flag = 1 #不能加强了
+                        # else:
+                        #     test_flag = 0
+                        
+                        if r2 > random.uniform(0.80,0.85):
+                            test_flag = 1 #别用第二个加强了
+                        else: 
+                            test_flag = 0
+                        # if test_flag == 1:
                         print(f'这是模型第{epoch}的测试结果，接下来按照城市显示结果：')
                         for i in range(len(y_test3)):
                             print(f'对于第{i}个测试集的结果：')
                             for j,city in enumerate(current_cities):
                                 print(f'城市{city}的预测值为：{preds[i][j]}')
                                 print(f'城市{city}的真实值为：{y_test3[i][j]}')
+
+                            
                                 
 
         torch.save(model.state_dict(),f'{save_dir}/{config.mod}.pth')
@@ -847,7 +1087,7 @@ if __name__ == "__main__":
         help="Batch size used in the training and validation loop.",
     )
     parser.add_argument(
-        "--epochs", default=200000, type=int, help="Total number of epochs."
+        "--epochs", default=20000, type=int, help="Total number of epochs."
     )
     parser.add_argument(
         "--lr",
@@ -856,7 +1096,7 @@ if __name__ == "__main__":
         help="Base learning rate at the start of the training.",
     )
     parser.add_argument(
-        "--ckpt", default=2000, type=int, help="Save model every ckpt epochs."
+        "--ckpt", default=1000, type=int, help="Save model every ckpt epochs."
     )
     parser.add_argument(
         "--train_set_path", default="", type=str, help="Path to the training set."

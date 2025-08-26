@@ -3,9 +3,34 @@
     "configurations": [
         {
             "name": "Train and Test Model (CUDA 0 - Wb)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wb",
+                "--dataset", "huabei_1993to2017.xlsx",
+                // "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250525175932/DCLFormer.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
+            "name": "Train and Test Model (CUDA 0 - Wb) -- version 2.0",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "trainer2.py",
             "args": [
                 "--train",
                 "--test",
@@ -28,7 +53,7 @@
         },
         {
             "name": "Generate Weights (CUDA 0 - Wb)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer_weights.py",
             "args": [
@@ -52,8 +77,58 @@
             "justMyCode": true
         },
         {
+            "name": "Generate Weights (CUDA 0 - Wg) --version 2.0",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "trainer_weightsv2.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wg",
+                "--dataset", "huabei_1993to2017.xlsx",
+                "--checkpoint_path","model/DCLFormer/['Wg']_sc2_20250628125514/DCLFormer_22999.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        {
+            "name": "Generate Weights (CUDA 0 - Wb) --version 2.0",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "trainer_weightsv2.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wb",
+                "--dataset", "huabei_1993to2017.xlsx",
+                "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250628125513/DCLFormer_54999.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        { // debugpy trainer_weights.py
             "name": "Generate Weights (CUDA 0 - Wg)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer_weights.py",
             "args": [
@@ -76,9 +151,59 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true
         },
+        { // debugpy trainer_weights.py
+            "name": "Infer Model! (CUDA 0 - Wg)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "trainer_infer.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wg",
+                "--dataset", "huabei_1993to2017.xlsx",
+                // "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250525175932/DCLFormer.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
+        { // debugpy trainer_weights.py
+            "name": "Infer Model! (CUDA 0 - Wb)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "trainer_infer.py",
+            "args": [
+                "--train",
+                "--test",
+                "--cuda", "0",
+                "--targets", "Wb",
+                "--dataset", "huabei_1993to2017.xlsx",
+                // "--checkpoint_path","model/DCLFormer/['Wb']_sc2_20250525175932/DCLFormer.pth",
+                // "--features", "Tmax", "Tmin", "RH", "srad", "prec",
+                "--sc","2",
+                "--mod","DCLFormer",
+                // --features Tmax Tmin RH srad prec
+                
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        },
         {
             "name": "Train and Test Model (CUDA 1 - Wg)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer.py",
             "args": [
@@ -98,10 +223,10 @@
             },
             "cwd": "${workspaceFolder}",
             "justMyCode": true
-        },//python trainer.py --train --test --cuda 1  --targets Wg Wb  --dataset nanling.xlsx --features Tmax Tmin Tmean WS SH H P ETc
+        },//debugpy trainer.py --train --test --cuda 1  --targets Wg Wb  --dataset nanling.xlsx --features Tmax Tmin Tmean WS SH H P ETc
         { 
             "name": "Train and Test Model (CUDA 1 - Wg and Wb)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer.py",
             "args": [
@@ -119,7 +244,7 @@
         },
         { 
             "name": "Train and Test Model x.xlsx (CUDA 1 - Wg and Wb)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "trainer.py",
             "args": [
