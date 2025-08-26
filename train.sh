@@ -9,7 +9,7 @@ targets_0="Wb"
 targets_1="Wg"
 
 # mod1='DCLFormer'
-mod1='LSTM'
+mod1='CNN+LSTM'
 # mod1='CNN+LSTM'
 
 # ssh -p 30611 zhaohui1.wang@10.251.18.148

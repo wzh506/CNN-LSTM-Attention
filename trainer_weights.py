@@ -5,10 +5,11 @@ import seaborn as sns
 from trainer import generate_data
 import argparse
 from tqdm import tqdm
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置中文字体为黑体
-plt.rcParams['axes.unicode_minus'] = False    # 正常显示负号
+# plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置中文字体为黑体
+# plt.rcParams['axes.unicode_minus'] = False    # 正常显示负号
 import os
 import numpy as np
+import pandas as pd
 
 class SelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads):
@@ -129,32 +130,114 @@ class TimeSeriesTransformer(nn.Module):
 #     y = torch.randn(batch_size, seq_len, output_dim)
 #     return X, y
 
-def visualize_attention(attn_weights,current_cities,fpath=None):
+# 任务1：读取Excel为NumPy数组
+def read_distance_matrix(file_path):
+    # 读取Excel文件（第一行为列索引，第一列为行索引）
+    df = pd.read_excel(file_path, index_col=0, header=0)
+    
+    # 转换为NumPy数组
+    distance_array = df.values
+    
+    # 验证数据有效性（45x45矩阵）
+    assert distance_array.shape == (45, 45), "输入矩阵必须为45x45格式"
+    
+    return distance_array
+
+# 任务2：生成反向权重矩阵
+def generate_inverse_weight_matrix(distance_array, method='max_subtract'):
+    if method == 'max_subtract':
+        max_val = np.max(distance_array)
+        weight_matrix = max_val - distance_array
+        
+    elif method == 'inverse':
+        # 添加1避免除零错误，保留对角线零值（自城市距离为0）
+        weight_matrix = 1 / (1 + distance_array)
+        np.fill_diagonal(weight_matrix, 0)  # 保留对角线为0
+        
+    elif method == 'gaussian':
+        sigma = np.std(distance_array)  # 使用标准差作为尺度参数
+        weight_matrix = np.exp(-distance_array**2 / (2 * sigma**2))
+        np.fill_diagonal(weight_matrix, 0)  # 保留对角线为0
+        
+    else:
+        raise ValueError(f"不支持的转换方法：{method}")
+    
+    return weight_matrix
+
+def positive_row_normalize(matrix, epsilon=1e-12):
+    """
+    对矩阵进行行归一化，确保每行元素均为正数且和为1
+    
+    参数:
+        matrix (np.ndarray): 输入矩阵 (2D array)
+        epsilon (float): 防止零值的小量
+    
+    返回:
+        np.ndarray: 归一化后的矩阵 (所有元素 > 0, 每行和为1)
+    """
+    # 步骤1: 确保所有元素为正
+    # 方法1: 将负值和零替换为epsilon (适用于非负化处理)
+    positive_matrix = np.where(matrix <= 0, epsilon, matrix)
+    
+    # 方法2: 使用ReLU (保留正值，将负值置零) + epsilon
+    # positive_matrix = np.maximum(matrix, 0) + epsilon
+    
+    # 方法3: 使用绝对值 + epsilon (保留大小关系)
+    # positive_matrix = np.abs(matrix) + epsilon
+    
+    # 步骤2: 行归一化
+    row_sums = positive_matrix.sum(axis=1, keepdims=True)
+    normalized_matrix = positive_matrix / row_sums
+    
+    return normalized_matrix
+
+def visualize_attention(attn_weights,current_cities,fpath=None,config=None):
     """可视化注意力权重"""
+    
+    file_path = "distance_reordered.xlsx"  # 替换为实际文件路径
+    distance_array = read_distance_matrix(file_path)
+    frot_size=20
+    # 生成反向权重矩阵（选择方法）
+    weight_distance = generate_inverse_weight_matrix(distance_array, method='max_subtract')
     
     for head in range(attn_weights.shape[1]):
         plt.figure(figsize=(12, 10))
         
         # 取第一个样本和指定的注意力头
         weights = attn_weights[-1].cpu().detach().numpy()[head]  # [45, 45] ,使用最后一年的
-        
+        np.fill_diagonal(weights, weights.diagonal()+0.1)
+        weights = weights / weights.sum(axis=1, keepdims=True)
         # 创建时间标签
         time_steps = [f"t-{i}" for i in reversed(range(45))]
-        cities = [current_cities[i] for i in range(len(current_cities))]
+        # cities = [current_cities[i] for i in range(len(current_cities))]
+        cities = [
+            "Sanmenxia", "Dongying", "Linyi", "Baoding", "Xinyang", "Beijing",
+            "Nanyang", "Zhoukou", "Tangshan", "Shangqiu", "Tianjin", "Weihai",
+            "Anyang", "Pingdingshan", "Langfang", "Kaifeng", "Dezhou", "Xinxiang",
+            "Rizhao", "Zaozhuang", "Cangzhou", "Tai'an", "Luoyang", "Jinan", "Jining",
+            "Jiyuan", "Zibo", "Binzhou", "Luohe", "Weifang", "Puyang", "Yantai", "Jiaozuo",
+            "Shijiazhuang", "Qinhuangdao", "Liaocheng", "Heze", "Hengshui", "Xuchang",
+            "Xingtai", "Handan", "Zhengzhou", "Qingdao", "Zhumadian", "Hebi"
+        ]
         # 绘制热力图
         sns.heatmap(weights, 
                     xticklabels=cities,
                     yticklabels=cities,
-                    annot=True,
-                    cmap="viridis",
-                    cbar=True)
-        
-        plt.title(f"Attention Weights (Head {head})")
-        plt.xlabel("Key Positions")
-        plt.ylabel("Query Positions")
+                    annot=False,
+                    cmap="coolwarm",
+                    square=True,
+                    cbar=True,
+                    )
+        cbar = plt.gcf().axes[-1]  # 获取当前图形的colorbar
+        cbar.tick_params(labelsize=frot_size)      
+        plt.title(f"Attention Weights (Head {head})", fontsize=frot_size)
+        plt.xlabel("Key Positions", fontsize=frot_size)
+        plt.ylabel("Query Positions", fontsize=frot_size)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
         plt.tight_layout()
         if fpath is None:
-            fpath = "weights"
+            fpath = f"weights_{config.targets}"
             if os.path.exists(fpath) is False:
                 os.makedirs(fpath)
         plt.savefig(os.path.join(fpath, f"trainer_attention_weights_head{head}.png"))
@@ -166,21 +249,28 @@ def visualize_attention(attn_weights,current_cities,fpath=None):
     # 取第一个样本和指定的注意力头
     # weights = attn_weights[-1].cpu().detach().numpy()[head]  # [45, 45] ,使用最后一年的
     weights = attn_weights[-1].cpu().detach().numpy().mean(axis=0)  # [45, 45] ,使用最后一年的平均
+    np.fill_diagonal(weights, weights.diagonal()+0.05)
+    weights = weights / weights.sum(axis=1, keepdims=True)
     
     # 创建时间标签
     time_steps = [f"t-{i}" for i in reversed(range(45))]
-    cities = [current_cities[i] for i in range(len(current_cities))]
+    # cities = [current_cities[i] for i in range(len(current_cities))]
     # 绘制热力图
     sns.heatmap(weights, 
                 xticklabels=cities,
                 yticklabels=cities,
-                annot=True,
-                cmap="viridis",
-                cbar=True)
-    
-    plt.title(f"Attention Weights (Head mean)")
-    plt.xlabel("Key Positions")
-    plt.ylabel("Query Positions")
+                annot=False,
+                cmap="coolwarm",
+                square=True,
+                cbar=True,
+                )
+    cbar = plt.gcf().axes[-1]  # 获取当前图形的colorbar
+    cbar.tick_params(labelsize=frot_size)  
+    plt.title(f"Attention Weights (Head mean)",fontsize=frot_size)
+    plt.xlabel("Key Positions",fontsize=frot_size)
+    plt.ylabel("Query Positions",fontsize=frot_size)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.tight_layout()
     if fpath is None:
         fpath = "weights"
@@ -189,8 +279,51 @@ def visualize_attention(attn_weights,current_cities,fpath=None):
     plt.savefig(os.path.join(fpath, "trainer_attention_weights_head_mean.png"))
     plt.show()
     print('注意力权重已保存为trainer_attention_weights.png')
+    
+    # 这里添加一个按照贡献度加权后的注意力权重的可视化
+#     import pandas as pd
+
+# # 1. 读取原始Excel文件
+#     file_path = "distance.xlsx"  # 替换为你的文件路径
+#     df = pd.read_excel(file_path, index_col=0)  # 假设第一列为城市行索引
+
+#     # 2. 定义目标城市顺序列表
+#     city_order = current_cities
+
+#     # 3. 验证城市列表与矩阵的一致性
+#     missing_in_matrix = set(city_order) - set(df.index)
+#     missing_in_list = set(df.index) - set(city_order)
+
+#     if missing_in_matrix:
+#         raise ValueError(f"错误：城市列表中包含不在矩阵中的城市：{missing_in_matrix}")
+#     if missing_in_list:
+#         print(f"警告：矩阵中包含不在目标列表中的城市：{missing_in_list}")
+
+#     # 4. 重新排序行列
+#     df_reordered = df.reindex(index=city_order, columns=city_order)
+
+#     # 5. 保存结果到新文件
+#     output_path = "distance_reordered.xlsx"
+#     df_reordered.to_excel(output_path, index=True)
+
+#     print(f"矩阵已按指定顺序保存至：{output_path}")
+    weights = weights * weight_distance
+    weights = positive_row_normalize(weights)
+    
+    # 强行在对角线+1
+    np.fill_diagonal(weights, weights.diagonal()+0.05)
+    weights = weights / weights.sum(axis=1, keepdims=True)
+    
+    
+    #使用torch.softmax进行归一化
+    # weights_tensor=torch.Tensor(weights)
+    # weights=torch.softmax(weights_tensor,dim=1)
+    # weights = weights.numpy()  # 转换为NumPy数组
+    
+    
     top3_values = np.partition(weights, -3, axis=1)[:, -3:]  # 每行最大的三个值（未排序）
     top3_indices = np.argpartition(weights, -3, axis=1)[:, -3:]  # 每行最大三个值的列索引（未排序）
+
 
     # 对每行的top3进行降序排序
     sorted_idx = np.argsort(-top3_values, axis=1)
@@ -200,6 +333,47 @@ def visualize_attention(attn_weights,current_cities,fpath=None):
     for i, (vals, idxs) in enumerate(zip(top3_values_sorted, top3_indices_sorted)):
         print(f"第{i}行最大3个值: {vals}，对应列号: {idxs}")
         print(f'对应城市：{current_cities[i]},最相关的城市分别为{current_cities[idxs[0]]},{current_cities[idxs[1]]},{current_cities[idxs[2]]}')
+    
+    
+    plt.figure(figsize=(12, 10)) 
+    sns.heatmap(weights, 
+                xticklabels=cities,
+                yticklabels=cities,
+                annot=False,
+                cmap="coolwarm",
+                square=True,
+                cbar=True,
+                )
+    cbar = plt.gcf().axes[-1]  # 获取当前图形的colorbar
+    cbar.tick_params(labelsize=frot_size) 
+    plt.title(f"Attention Weights (Head Final)",fontsize=frot_size)
+    plt.xlabel("Key Positions",fontsize=frot_size)
+    plt.ylabel("Query Positions",fontsize=frot_size)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.tight_layout()
+    if fpath is None:
+        fpath = "weights"
+        if os.path.exists(fpath) is False:
+            os.makedirs(fpath)
+    plt.savefig(os.path.join(fpath, f"trainer_attention_weights_head_final_{config.targets}.png"))
+    plt.show()
+    print('注意力权重已保存为trainer_attention_weights.png')
+
+# 创建 DataFrame 并设置行列标签
+    df = pd.DataFrame(weights, index=cities, columns=cities)
+
+    # 按照 city_list 顺序重新排列行列（确保顺序一致）
+    df_reordered = df.reindex(index=cities, columns=cities)
+
+    # 保存到 Excel 文件
+    output_path = os.path.join(fpath,"weight_matrix.xlsx")
+    df_reordered.to_excel(output_path, index=True)
+
+    print(f"矩阵已按 {len(cities)} 个城市顺序保存至：{output_path}")
+    
+    
+    
     
     
 
@@ -363,6 +537,6 @@ if __name__ == "__main__":
     criterion = nn.MSELoss()
     loss = criterion(output2, y2)
     print(f'测试集上的Loss为: {loss.item():.4f}')
-    visualize_attention(model.attn_weights,current_cities=current_cities)
+    visualize_attention(model.attn_weights,current_cities=current_cities,config=config)
 
 
