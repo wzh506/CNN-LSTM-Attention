@@ -1,0 +1,104 @@
+============================================
+Starting experiment with parameters:
+ - TARGETS: Wb
+ - SCALE (sc): 1
+ - CUDA DEVICE: 0
+ - Model: LSTM
+============================================
+all_cities: Index(['city', 'year', 'prec', 'RH', 'srad', 'Tmax', 'Tmin', 'Tavg', 'VPD',
+       'wind', 'Wb', 'Wg'],
+      dtype='object')
+原始城市数: 45 → 有效城市数: 45
+原始城市数: 45 → 有效城市数: 45
+被过滤城市 (0个): 无
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+input_features: (45, 13)
+window_data : (45, 3)
+current_features: (45, 4)
+valid_cities: ['济宁市', '驻马店市', '廊坊市', '北京市', '邯郸市', '淄博市', '日照市', '焦作市', '泰安市', '聊城市', '菏泽市', '济源市', '濮阳市', '威海市', '漯河市', '许昌市', '临沂市', '商丘市', '唐山市', '东营市', '洛阳市', '秦皇岛市', '郑州市', '三门峡市', '德州市', '周口市', '枣庄市', '信阳市', '烟台市', '新乡市', '衡水市', '开封市', '沧州市', '天津市', '滨州市', '鹤壁市', '邢台市', '石家庄市', '保定市', '安阳市', '潍坊市', '南阳市', '济南市', '青岛市', '平顶山市']
+输入数据维度: torch.Size([22, 45, 13])
+目标数据维度: torch.Size([22, 45, 1])
+训练集大小: torch.Size([3, 45, 13])
+测试集大小: torch.Size([19, 45, 13])
+使用的模型为: LSTM
+Training:   0%|          | 0/100000 [00:00<?, ?it/s]Training:   0%|          | 1/100000 [00:00<5:51:28,  4.74it/s]Training:   0%|          | 22/100000 [00:00<19:16, 86.45it/s] Training:   0%|          | 44/100000 [00:00<12:31, 133.01it/s]Training:   0%|          | 66/100000 [00:00<10:21, 160.88it/s]Training:   0%|          | 88/100000 [00:00<09:20, 178.37it/s]Training:   0%|          | 110/100000 [00:00<08:46, 189.76it/s]Training:   0%|          | 132/100000 [00:00<08:27, 196.87it/s]Training:   0%|          | 153/100000 [00:00<08:19, 199.85it/s]Training:   0%|          | 175/100000 [00:01<08:11, 203.02it/s]Training:   0%|          | 196/100000 [00:01<08:07, 204.56it/s]Training:   0%|          | 218/100000 [00:01<08:01, 207.06it/s]Training:   0%|          | 240/100000 [00:01<07:57, 208.74it/s]Training:   0%|          | 262/100000 [00:01<07:54, 210.04it/s]Training:   0%|          | 284/100000 [00:01<07:52, 210.98it/s]Training:   0%|          | 306/100000 [00:01<07:50, 211.67it/s]Training:   0%|          | 328/100000 [00:01<07:49, 212.20it/s]Training:   0%|          | 346/100000 [00:01<08:50, 187.72it/s]
+Traceback (most recent call last):
+  File "trainer.py", line 995, in <module>
+    train_model(config)
+  File "trainer.py", line 740, in train_model
+    outputs = model(inputs)
+  File "/home/zhaohui1.wang/miniconda3/envs/yoyo/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/zhaohui1.wang/miniconda3/envs/yoyo/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/zhaohui1.wang/github/CNN-LSTM-Attention/models/model.py", line 630, in forward
+    out, _ = self.lstm(combined[:,:,:-1])  # out shape: [batch, seq_len, hidden_dim]
+  File "/home/zhaohui1.wang/miniconda3/envs/yoyo/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/zhaohui1.wang/miniconda3/envs/yoyo/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/zhaohui1.wang/miniconda3/envs/yoyo/lib/python3.8/site-packages/torch/nn/modules/rnn.py", line 917, in forward
+    result = _VF.lstm(input, hx, self._flat_weights, self.bias, self.num_layers,
+KeyboardInterrupt
