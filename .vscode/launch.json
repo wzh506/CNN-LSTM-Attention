@@ -155,7 +155,7 @@
             "name": "Infer Model! (CUDA 0 - Wg)",
             "type": "debugpy",
             "request": "launch",
-            "program": "trainer_infer.py",
+            "program": "trainer2_infer.py",
             "args": [
                 "--train",
                 "--test",
@@ -180,7 +180,7 @@
             "name": "Infer Model! (CUDA 0 - Wb)",
             "type": "debugpy",
             "request": "launch",
-            "program": "trainer_infer.py",
+            "program": "trainer2_infer.py",
             "args": [
                 "--train",
                 "--test",
@@ -224,45 +224,45 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true
         },//debugpy trainer.py --train --test --cuda 1  --targets Wg Wb  --dataset nanling.xlsx --features Tmax Tmin Tmean WS SH H P ETc
-        { 
-            "name": "Train and Test Model (CUDA 1 - Wg and Wb)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "trainer.py",
-            "args": [
-                "--train",
-                "--test",
-                "--cuda", "0",
-                "--targets", "Wg","Wb"
-            ],
-            "console": "integratedTerminal",
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "1"
-            },
-            "cwd": "${workspaceFolder}",
-            "justMyCode": false
-        },
-        { 
-            "name": "Train and Test Model x.xlsx (CUDA 1 - Wg and Wb)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "trainer.py",
-            "args": [
-                "--train",
-                "--test",
-                "--dataset","nanling.xlsx",
-                "--features","Tmax" ,"Tmin" ,"Tmean" ,"WS" ,"SH" ,"H" ,"P" ,"ETc",
-                "--cuda", "0",
-                "--targets", "Wg","Wb"
-                // "--targets", "Wb"
+        // { 
+        //     "name": "Train and Test Model (CUDA 1 - Wg and Wb)",
+        //     "type": "debugpy",
+        //     "request": "launch",
+        //     "program": "trainer.py",
+        //     "args": [
+        //         "--train",
+        //         "--test",
+        //         "--cuda", "0",
+        //         "--targets", "Wg","Wb"
+        //     ],
+        //     "console": "integratedTerminal",
+        //     "env": {
+        //         "CUDA_VISIBLE_DEVICES": "1"
+        //     },
+        //     "cwd": "${workspaceFolder}",
+        //     "justMyCode": false
+        // },
+        // { 
+        //     "name": "Train and Test Model x.xlsx (CUDA 1 - Wg and Wb)",
+        //     "type": "debugpy",
+        //     "request": "launch",
+        //     "program": "trainer.py",
+        //     "args": [
+        //         "--train",
+        //         "--test",
+        //         "--dataset","nanling.xlsx",
+        //         "--features","Tmax" ,"Tmin" ,"Tmean" ,"WS" ,"SH" ,"H" ,"P" ,"ETc",
+        //         "--cuda", "0",
+        //         "--targets", "Wg","Wb"
+        //         // "--targets", "Wb"
 
-            ],
-            "console": "integratedTerminal",
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "1"
-            },
-            "cwd": "${workspaceFolder}",
-            "justMyCode": false
-        },
+        //     ],
+        //     "console": "integratedTerminal",
+        //     "env": {
+        //         "CUDA_VISIBLE_DEVICES": "1"
+        //     },
+        //     "cwd": "${workspaceFolder}",
+        //     "justMyCode": false
+        // },
     ]
 }
