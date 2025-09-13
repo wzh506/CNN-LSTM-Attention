@@ -1,3 +1,8 @@
 model
 /weights
+<<<<<<< HEAD
 /model_infer
+=======
+/model_infer
+/model_infer2
+>>>>>>> 90aacb6bbc5d8629f83ad250accbc5f4f40a0585
