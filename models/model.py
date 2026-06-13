@@ -598,7 +598,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, output_size,num_layers=3,hidden_dim=256,num_cities=45,embed_dim=1):
+    def __init__(self, input_size, output_size,num_layers=3,hidden_dim=256,num_cities=45,embed_dim=128):
         super(LSTM, self).__init__()
         # self.lstm = nn.LSTM(input_size, hidden_dim, batch_first=True) #
         
@@ -632,7 +632,7 @@ class LSTM(nn.Module):
         return out
     
 class CNN_LSTM(nn.Module):
-    def __init__(self, input_size, output_size, hidden_dim=256,num_cities=45,embed_dim=1):
+    def __init__(self, input_size, output_size, hidden_dim=256,num_cities=45,embed_dim=128):
         super(CNN_LSTM, self).__init__()
 
         self.city_embed = nn.Embedding(

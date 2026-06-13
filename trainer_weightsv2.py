@@ -1,3 +1,7 @@
+# 创建人：王朝晖
+# 创建时间：2026-04-18
+# 功能：用于生成模型的可视化结果，包括城市相关性，时间相关性等等。
+
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt

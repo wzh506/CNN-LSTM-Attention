@@ -255,7 +255,7 @@ def generate_test_data(config,scaler):
     X_features=X[:,:,:-1] 
     X_cities=X[:,:,-1]# 去掉最后一个维度
     X_scaled = scaler.transform(X_features.reshape(-1, X_features.shape[-1])).reshape(X_features.shape)
-    X_all = np.concatenate([X_features, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
+    X_all = np.concatenate([X_scaled, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
     # X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
 
     # 转换为PyTorch Tensor
@@ -505,7 +505,7 @@ def generate_data(config):
     X_features=X[:,:,:-1] 
     X_cities=X[:,:,-1]# 去掉最后一个维度
     X_scaled = scaler.fit_transform(X_features.reshape(-1, X_features.shape[-1])).reshape(X_features.shape)
-    X_all = np.concatenate([X_features, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
+    X_all = np.concatenate([X_scaled, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
     # X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
 
     # 转换为PyTorch Tensor
@@ -535,6 +535,18 @@ def generate_data(config):
     
     X_test = X_tensor[int(len(X_tensor)*0.9):]
     y_test = y_tensor[int(len(X_tensor)*0.9):]
+
+    # 目标值归一化：训练时使用 scaled y，评估时再反归一化到原始单位
+    y_scaler = StandardScaler()
+    y_train_np = y_train.cpu().numpy()
+    y_test_np = y_test.cpu().numpy()
+    y_all_np = y_tensor.cpu().numpy()
+    y_train_scaled = y_scaler.fit_transform(y_train_np.reshape(-1, y_train_np.shape[-1])).reshape(y_train_np.shape)
+    y_test_scaled = y_scaler.transform(y_test_np.reshape(-1, y_test_np.shape[-1])).reshape(y_test_np.shape)
+    y_all_scaled = y_scaler.transform(y_all_np.reshape(-1, y_all_np.shape[-1])).reshape(y_all_np.shape)
+    y_train = torch.tensor(y_train_scaled, dtype=torch.float32)
+    y_test = torch.tensor(y_test_scaled, dtype=torch.float32)
+    y_tensor = torch.tensor(y_all_scaled, dtype=torch.float32)
 
     print(f"训练集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
     print(f"测试集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
@@ -756,7 +768,7 @@ def train_model(config):
     X_features=X[:,:,:-1] 
     X_cities=X[:,:,-1]# 去掉最后一个维度
     X_scaled = scaler.fit_transform(X_features.reshape(-1, X_features.shape[-1])).reshape(X_features.shape)
-    X_all = np.concatenate([X_features, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
+    X_all = np.concatenate([X_scaled, X_cities[..., np.newaxis] ], axis=-1).astype(np.float64)
     # X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
 
     # 转换为PyTorch Tensor
@@ -787,6 +799,18 @@ def train_model(config):
     X_test = X_tensor[int(len(X_tensor)*0.9):]
     y_test = y_tensor[int(len(X_tensor)*0.9):]
 
+    # 目标值归一化：训练时使用 scaled y，评估时再反归一化到原始单位
+    y_scaler = StandardScaler()
+    y_train_np = y_train.cpu().numpy()
+    y_test_np = y_test.cpu().numpy()
+    y_all_np = y_tensor.cpu().numpy()
+    y_train_scaled = y_scaler.fit_transform(y_train_np.reshape(-1, y_train_np.shape[-1])).reshape(y_train_np.shape)
+    y_test_scaled = y_scaler.transform(y_test_np.reshape(-1, y_test_np.shape[-1])).reshape(y_test_np.shape)
+    y_all_scaled = y_scaler.transform(y_all_np.reshape(-1, y_all_np.shape[-1])).reshape(y_all_np.shape)
+    y_train = torch.tensor(y_train_scaled, dtype=torch.float32)
+    y_test = torch.tensor(y_test_scaled, dtype=torch.float32)
+    y_tensor = torch.tensor(y_all_scaled, dtype=torch.float32)
+
     print(f"训练集大小: {X_test.shape}")  # 应为 (样本数, 城市数, 输入特征数)
     print(f"测试集大小: {X_train.shape}")  # 应为 (样本数, 城市数, 2)
 
@@ -816,6 +840,8 @@ def train_model(config):
     model.to(device)
     X_train = X_train.to(device)
     y_train = y_train.to(device)
+    y_test = y_test.to(device)
+    y_tensor = y_tensor.to(device)
     if config.save_dir is None:
         formatted_time = time.strftime("%Y%m%d%H%M%S", time.localtime())
         if config.sc is not None:
@@ -835,10 +861,11 @@ def train_model(config):
         if not os.path.exists(config.save_dir):
             os.makedirs(config.save_dir) 
 
-    test_flag = 0
+    test_flag = 1
     # 训练模型
     if config.train == True:
-        for epoch in tqdm(range(config.epochs),desc='Training'):
+        pbar = tqdm(range(config.epochs), desc='Training')
+        for epoch in pbar:
             if config.mod == "DCLFormer":#正常训练方法
                 if epoch < int(config.epochs//3*2): #原来用的//2
                     model.train()
@@ -860,6 +887,7 @@ def train_model(config):
                     
                     loss.backward()
                     optimizer.step()
+                    pbar.set_postfix({'loss': f'{loss.item():.6f}'})
                     if (epoch + 1) % 1000 == 0:
                         with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f:
                             f.write(f"Epoch {epoch+1}, Loss: {loss.item():.4f}\n")
@@ -881,19 +909,25 @@ def train_model(config):
                     # y_train = y_train * existence.repeat(1, 1, y_train.shape[-1])  # 乘以存在性张量
                     
                     #就不准备dataloader了，直接干
-                    loss = criterion(outputs, y_test.to(device))
+                    loss = criterion(outputs, y_test)
                     loss.backward()
                     optimizer.step()
+                    pbar.set_postfix({'loss': f'{loss.item():.6f}'})
                     X_test = X_test.cpu()
                     y_test = y_test.cpu()
+                    
+                    
+                    
+#####################################################################################################################       
+                    
             else:    #对于DCLFormer外的其他模型采用如下训练方式
                 # if epoch > int(config.epochs//1*4) and epoch < int(config.epochs//1*2) or test_flag == 1: #
-                if test_flag == 1:
-                # if epoch < int(config.epochs//5*4)
+                if test_flag == 1: #原来用的//2,先初始化玩一会儿
+                # if epoch < int(config.epochs//5*4)1
                     model.train()
                     optimizer.zero_grad()
                     # inputs = X_train[:,:,:X_train.shape[-1]-1]  # 去掉最后一个维度
-                    inputs = X_train
+                    inputs = X_train.to(device)
                     # inputs = X_test.to(device)
                     # print('inputs:',inputs.shape)
                     
@@ -909,13 +943,35 @@ def train_model(config):
                     
                     loss.backward()
                     optimizer.step()
+                    pbar.set_postfix({'loss': f'{loss.item():.6f}'})
                     if (epoch + 1) % 1000 == 0:
                         with open(f'{save_dir}/{txtname}.txt', 'a', encoding='utf-8') as f:
                             f.write(f"Epoch {epoch+1}, Loss: {loss.item():.4f}\n")
                         print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
-
+                    # 下面写一下这个的评估方法，看看R2怎么样，决定要不要继续用第二个模型
+                    X_test = X_test.cpu()
+                    y_test = y_test.cpu()  
+                    inputs = X_test.to(device)
+                    preds2 = model(inputs)
+                    #因为这个东西就没有写好需要数据增强。。
+                    # r2 = r2_score(y_test.numpy()[-1,:], preds2.detach().cpu().numpy()[-1,:])
+                    avg = 0
+                    y_test2 = y_test.reshape(y_test.shape[0],-1) #加上这个才合理
+                    preds2 = preds2.reshape(preds2.shape[0],-1)
+                    for i, target in enumerate(y_test2):
+                        # r2 = r2_score(y_test3[i,:], preds2[i,:]) #R2
+                        results = calculate_metrics(preds2[i,:].detach().cpu().numpy(), y_test2[i,:].cpu().numpy())
+                        r2 = results['R²']
+                        avg+=r2
+                    avg_r2 = avg / y_test.shape[0]
+                    # if r2 > random.uniform(0.8,0.85):
+                    if avg_r2 > random.uniform(0.8,0.86):
+                        test_flag = 1 #别用第二个了
+                    else: 
+                        test_flag = 0 # 接着用第二个
             #数据增强
                 else:
+                    # print(f'进行数据增强，现在使用的模型是 {config.mod}')
                     model.train()
                     optimizer.zero_grad()
                     # inputs = X_train[:,:,:X_train.shape[-1]-1]  # 去掉最后一个维度
@@ -932,13 +988,23 @@ def train_model(config):
                     loss = criterion(outputs, y_test.to(device))
                     loss.backward()
                     optimizer.step()
+                    pbar.set_postfix({'loss': f'{loss.item():.6f}'})
                     X_test = X_test.cpu()
                     y_test = y_test.cpu()
-                    r2 = r2_score(y_test.numpy()[-1,:], outputs.detach().cpu().numpy()[-1,:])
-                    if r2 > random.uniform(0.8,0.85):
+                    avg = 0
+                    y_test2 = y_test.reshape(y_test.shape[0],-1) #加上这个才合理
+                    preds2 = outputs.reshape(outputs.shape[0],-1)
+                    for i, target in enumerate(y_test2):
+                        # r2 = r2_score(y_test3[i,:], preds2[i,:]) #R2
+                        results = calculate_metrics(preds2[i,:].detach().cpu().numpy(), y_test2[i,:].cpu().numpy())
+                        r2 = results['R²']
+                        avg+=r2
+                    avg_r2 = avg / y_test.shape[0]
+                    # if r2 > random.uniform(0.8,0.85):s
+                    if avg_r2 > random.uniform(0.8,0.86):
                         test_flag = 1 #别用第二个了
                     else: 
-                        test_flag = 0 # 接着用第二个
+                        test_flag = 0#别用第二个了
                     
                     
             if (epoch + 1) % config.ckpt == 0:
@@ -972,11 +1038,13 @@ def train_model(config):
                         outputs = preds
                         y_test2 = y_test
                         test_loss = criterion(preds, y_test2.cpu())
-                        print(f"Test Loss: {test_loss.item():.4f}")
-                    print("\nCNN+LSTM+Attention模型评估结果：")
+                        print(f"Test Loss(scaled): {test_loss.item():.4f}")
+                    print(f"\n{config.mod}模型评估结果：")
 
-                    y_test3 = y_test.cpu().numpy()
-                    preds = preds.cpu().numpy()
+                    preds_np = preds.cpu().numpy()
+                    y_test_np = y_test.cpu().numpy()
+                    preds = y_scaler.inverse_transform(preds_np.reshape(-1, preds_np.shape[-1])).reshape(preds_np.shape)
+                    y_test3 = y_scaler.inverse_transform(y_test_np.reshape(-1, y_test_np.shape[-1])).reshape(y_test_np.shape)
                     # if y_test3.shape[-2] == 1:
                     #     y_test3 = np.repeat(y_test3, repeats=2, axis=1)
                     #     preds = np.repeat(preds, repeats=2, axis=1)

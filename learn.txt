@@ -1,0 +1,32 @@
+
+
+
+
+1.训练的代码
+python trainer2.py \
+            --train \
+            --test \
+            --cuda 1 \
+            --targets Wg \
+            --dataset huabei_1993to2021.xlsx \
+            --sc 2 \
+            --mod 'DCLFormer' \
+            --epochs 30000  > "DCLFormer_Wg_v2_sc2.log" 2>&1 &  
+
+
+2.测试的代码
+
+
+
+
+
+
+3.生成注意力权重的代码
+
+
+
+
+
+4.其他模型（CNN，CNN+LSTM）运行需要使用的代码
+代码是train.sh,train_wb.sh,train_wg.sh
+结果位于Logs下面

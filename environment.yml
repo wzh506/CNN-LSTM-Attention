@@ -74,4 +74,4 @@ dependencies:
       - tzdata==2025.2
       - xgboost==2.1.4
       - zipp==3.20.2
-prefix: /home/zhaohui1.wang/miniconda3/envs/yoyo
+# prefix: /home/zhaohui1.wang/miniconda3/envs/yoyo

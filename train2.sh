@@ -1,6 +1,8 @@
 
 
-dataset="huabei_1993to2017.xlsx"
+# dataset="huabei_1993to2017.xlsx"
+echo "============================================"
+dataset="huabei_1993to2021.xlsx"
 
 cuda_device_0="0"
 cuda_device_1="1"
@@ -13,12 +15,15 @@ mod1='DCLFormer'
 # mod1='CNN+LSTM'
 
 # ssh -p 30611 zhaohui1.wang@10.251.18.148
-epochs=100000
-
+epochs=50000
+echo "============================================"
 # 循环执行不同sc值
 # for sc in {1..6}; do
 for sc in {1..6}; do
+#  for sc in {2..2}; do
     # 并行执行两个实验任务
+    safe_mod1=$(echo "$mod1" | tr '+' '_' | tr ' ' '_')
+    mkdir -p "logs/$safe_mod1"
     (
         # 任务1 - CUDA 0
         echo "============================================"
@@ -37,7 +42,7 @@ for sc in {1..6}; do
             --sc $sc \
             --mod $mod1 \
             --epochs $epochs
-    ) > "${mod1}_sc${sc}_Wb_v2.log" 2>&1 &  # 重定向输出到日志文件
+    ) > "logs/${safe_mod1}/${safe_mod1}_sc${sc}_Wb_v2.log" 2>&1 &  # 重定向输出到日志文件
 
     (
         # 任务2 - CUDA 1
@@ -57,7 +62,7 @@ for sc in {1..6}; do
             --sc $sc \
             --mod $mod1 \
             --epochs $epochs
-    ) > "${mod1}_sc${sc}_Wg_v2.log" 2>&1 &
+    ) > "logs/${safe_mod1}/${safe_mod1}_sc${sc}_Wg_v2.log" 2>&1 &
 
     # 等待当前sc的两个并行任务完成
     wait

@@ -2,6 +2,9 @@
 
 dataset="huabei_1993to2017.xlsx"
 
+# Force Python to flush stdout/stderr immediately so logs update during training
+export PYTHONUNBUFFERED=1
+
 cuda_device_0="0"
 cuda_device_1="1"
 
@@ -28,7 +31,7 @@ for sc in {1..6}; do
         echo " - CUDA DEVICE: $cuda_device_0"
         echo " - Model: $mod1"  
         echo "============================================"
-        python trainer.py \
+        python -u trainer.py \
             --train \
             --test \
             --cuda $cuda_device_0 \
@@ -48,7 +51,7 @@ for sc in {1..6}; do
         echo " - CUDA DEVICE: $cuda_device_1"
         echo " - Model: $mod1"
         echo "============================================"
-        python trainer.py \
+        python -u trainer.py \
             --train \
             --test \
             --cuda $cuda_device_1 \
